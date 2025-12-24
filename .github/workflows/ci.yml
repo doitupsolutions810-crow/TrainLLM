@@ -35,6 +35,15 @@ jobs:
           npm ci
           npm test
 
+      - name: Create backend attestation
+        run: |
+          cd backend
+          npx ts-node src/attestor.ts || true
+
+      - name: Create root attestation
+        run: |
+          npx ts-node attestor.ts || true
+
       - name: Run smoke script
         run: npm run smoke
 
