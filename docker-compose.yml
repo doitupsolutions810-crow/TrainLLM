@@ -22,3 +22,15 @@ services:
       - .env
     volumes:
       - ./frontend:/app/frontend
+
+  geometric:
+    build:
+      context: ./runtimes/geometric
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./runtimes/geometric/data:/data
+    restart: unless-stopped

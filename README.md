@@ -67,6 +67,7 @@ Notes
 
 - The attestor and governance in the backend are minimal demos; replace or extend attestation signing, RBAC, ZK proofs, and verification with production-grade implementations.
 - The frontend includes a simple proxy API route to the backend at `/api/governance`.
+- A headless Python runtime is included under `runtimes/geometric` implementing a Geometric Federated Runtime (streaming API, ZK placeholder, Merkle epochs, snappy compression). Build/run with Docker Compose (service: `geometric`) or build the image in `runtimes/geometric`.
 - Customize `.env.example` for region or local override values (e.g., `REGION`, `NEXTPUBLICBACKEND_URL`).
 ---
 
