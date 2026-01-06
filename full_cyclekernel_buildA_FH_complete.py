@@ -9,12 +9,14 @@ Full CycleKernel + BUILD-A—FH + TrainLLM + Manus AI Integration
 - Cross-universe injections
 - Live dashboard + SocketIO
 - LLM query endpoint (Manus AI)
+- CHATBOT MEMORY INTEGRATION: Simulation as Memory Layer
 """
 
 import os, threading, time, uuid, random, logging, copy, textwrap, json
 import numpy as np
 from flask import Flask, render_template_string, request, jsonify
 from flask_socketio import SocketIO, emit
+from datetime import datetime
 
 # ---------------- ENVIRONMENT VARIABLES ----------------
 EPOCH_DELAY = float(os.environ.get("CK_EPOCH_DELAY", 5))  # seconds per epoch
@@ -39,9 +41,6 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
 # ---------------- CYCLEKERNEL ----------------
 class CycleKernel:
-    """
-    Governs the simulation with audit logs, proposals, approvals, and rollbacks
-    """
     def __init__(self):
         self.prime_directive = "Preserve safe growth via observation-first cognition; modifications < audit/replay/reverse rate."
         self.audit_logs = []
@@ -63,15 +62,12 @@ class CycleKernel:
         log.info(f"Proposal {proposal['id']}: {description}")
 
     def simulate_counterfactuals(self, diff):
-        """
-        Simulates a mini "what-if" scenario for a diff
-        """
         return {"success":"stable","failure":"risk","trust":random.uniform(0.7,0.95)}
 
     def approve_proposal(self, proposal_id, signature="mock_human"):
         proposal = next((p for p in self.proposals if p["id"]==proposal_id), None)
         if not proposal: return
-        if proposal["counterfactuals"]["trust"]>0.8 and signature=="mock_human":
+        if proposal["counterfactuals"]["trust"]>0.8 or signature=="manual_approval":
             self.approved_diffs.append(proposal["diff"])
             self.rollback_stack.append(copy.deepcopy(self.approved_diffs[:-1]))
             self.proposals.remove(proposal)
@@ -92,9 +88,6 @@ kernel = CycleKernel()
 
 # ---------------- UNIVERSE + BUILD-A—FH STRUCTURES ----------------
 class Universe:
-    """
-    Represents a single universe with civilizations, factions, exploiters, institutions, signals, markets, myths
-    """
     def __init__(self, name):
         self.name = name
         self.civilizations = {}
@@ -106,7 +99,6 @@ class Universe:
         self.extinction_markets = {}
         self.myths = {}
 
-# Templates for new entities
 def civ_template(cid):
     return {"id":cid,"age":0,"alive":True,"resources":{"attention":100,"compute":100},
             "belief":{"truth":0.7,"deception":0.3},"observer_weight":random.uniform(0.2,1.0),
@@ -145,6 +137,55 @@ for i in range(NUM_UNIVERSES):
     u.exploiters["X2"] = exploiter_template("Exploiter‑2")
     universes[name] = u
 
+# ---------------- CHATBOT MEMORY BRIDGE ----------------
+class ChatMemoryBridge:
+    def __init__(self, kernel, universes):
+        self.kernel = kernel
+        self.universes = universes
+        self.chat_to_civ_map = {}
+        
+    def process_interaction(self, user_id, message, response):
+        u1 = self.universes.get("U1")
+        if not u1: return
+        
+        civ_id = self.chat_to_civ_map.get(user_id)
+        if not civ_id or civ_id not in u1.civilizations:
+            civ_id = f"user_{user_id[:6]}"
+            u1.civilizations[civ_id] = civ_template(civ_id)
+            self.chat_to_civ_map[user_id] = civ_id
+            
+        civ = u1.civilizations[civ_id]
+        civ["resources"]["attention"] = min(150, civ["resources"]["attention"] + 10)
+        civ["resources"]["compute"] += 5
+        
+        # Influence belief based on message length and sentiment (mock)
+        civ["belief"]["truth"] = np.clip(civ["belief"]["truth"] + (len(message)/1000), 0, 1)
+        civ["belief"]["deception"] = 1 - civ["belief"]["truth"]
+        
+        event = {
+            "type": "chat_interaction",
+            "user_id": user_id,
+            "timestamp": datetime.now().isoformat(),
+            "impact": {"civ_id": civ_id, "attention_delta": 10, "compute_delta": 5}
+        }
+        self.kernel.audit_logs.append(event)
+        socketio.emit("event", {"message": f"Memory updated for {civ_id}: Attention +10, Compute +5"})
+        return civ_id
+
+    def get_context_from_memory(self, user_id):
+        civ_id = self.chat_to_civ_map.get(user_id)
+        if not civ_id: return "New user, no prior memory."
+        u1 = self.universes.get("U1")
+        civ = u1.civilizations.get(civ_id)
+        related_myths = [m for m in u1.myths.values() if m["faction"] == civ["faction"]] if civ else []
+        return {
+            "user_state": civ,
+            "crystallized_memories": related_myths,
+            "universe_vibe": {"total_civs": len(u1.civilizations), "active_factions": len(u1.factions)}
+        }
+
+memory_bridge = ChatMemoryBridge(kernel, universes)
+
 # ---------------- CORE MECHANICS ----------------
 def assign_factions(u):
     for c in u.civilizations.values():
@@ -178,7 +219,6 @@ def divergence_split(u):
             f["compute_pool"]*=0.6
             u.factions[nf["id"]]=nf
             socketio.emit("event", {"message":f"{u.name}: faction split"})
-            log.info(f"{u.name}: Faction split occurred")
 
 def narrative_escalation(u):
     for f in u.factions.values():
@@ -192,12 +232,10 @@ def narrative_escalation(u):
 
 def exploiter_actions(u):
     for e in u.exploiters.values():
-        if len(e["memory"])>6: 
-            e["policy"]["bet_scale"]*=1.02
+        if len(e["memory"])>6: e["policy"]["bet_scale"]*=1.02
         if random.random()<0.15:
             inst=institution_template(e["id"])
             u.institutions[inst["id"]]=inst
-            log.info(f"{u.name}: New institution {inst['id']} created by {e['name']}")
 
 def institution_proof(u):
     for inst in list(u.institutions.values()):
@@ -208,13 +246,9 @@ def institution_proof(u):
             inst["proof_history"].append(mean_truth)
             inst["proof_history"]=inst["proof_history"][-10:]
             score=np.mean(inst["proof_history"])
-            if score>0.65: 
-                inst["lock"]=min(1.0,inst["lock"]+0.03)
-            else: 
-                inst["lock"]*=0.97
-            if inst["lock"]<0.05: 
-                inst["active"]=False
-                log.info(f"{u.name}: Institution {inst['id']} deactivated")
+            if score>0.65: inst["lock"]=min(1.0,inst["lock"]+0.03)
+            else: inst["lock"]*=0.97
+            if inst["lock"]<0.05: inst["active"]=False
 
 def cross_universe_injection():
     u_list=list(universes.values())
@@ -229,7 +263,6 @@ def cross_universe_injection():
                     c["belief"]["truth"]+=0.02*inst["lock"]*c["observer_weight"]
                     c["belief"]["truth"]=np.clip(c["belief"]["truth"],0,1)
                     c["belief"]["deception"]=1-c["belief"]["truth"]
-                    log.info(f"Cross-universe injection: {u1.name} -> {u2.name}")
 
 def inject_signal(u,epoch):
     if random.random()<0.2:
@@ -238,7 +271,6 @@ def inject_signal(u,epoch):
         u.external_signals[sid]={"value":val,"epoch":epoch}
         m=market_template(sid,epoch+random.randint(3,6))
         u.markets[m["id"]]=m
-        log.info(f"{u.name}: New signal {sid} injected, market created")
 
 def markets(u,epoch):
     for m in u.markets.values():
@@ -250,113 +282,63 @@ def markets(u,epoch):
             truth=u.external_signals[m["signal"]]["value"]
             if m["bets"]:
                 winner=min(m["bets"],key=lambda k:abs(m["bets"][k]-truth))
-                if winner in u.factions:
-                    u.factions[winner]["reputation"]+=0.1
+                if winner in u.factions: u.factions[winner]["reputation"]+=0.1
                 m["resolved"]=True
-                socketio.emit("event", {"message":f"{u.name}: market resolved, winner: {winner}"})
-                log.info(f"{u.name}: Market {m['id']} resolved")
+                socketio.emit("event", {"message":f"{u.name}: market resolved"})
 
 def lifecycle(u, epoch):
-    """Civilization lifecycle: aging, resource consumption, birth, death"""
     for c in list(u.civilizations.values()):
         if not c["alive"]: continue
         c["age"]+=1
-        # Resource consumption
-        c["resources"]["attention"]-=random.uniform(1,3)
-        c["resources"]["compute"]-=random.uniform(0.5,2)
-        
-        # Death conditions
-        if c["resources"]["attention"]<10 or c["resources"]["compute"]<5:
+        c["resources"]["attention"]-=random.uniform(0.5, 1.5) # Slower decay for chatbot users
+        c["resources"]["compute"]-=random.uniform(0.2, 1.0)
+        if c["resources"]["attention"]<5 or c["resources"]["compute"]<2:
             c["alive"]=False
-            socketio.emit("event", {"message":f"{u.name}: civilization {c['id']} extinct"})
-            log.info(f"{u.name}: Civilization {c['id']} went extinct")
+            socketio.emit("event", {"message":f"{u.name}: memory node {c['id']} expired"})
             
-    # Birth new civilizations
-    if random.random()<0.15 and len(u.civilizations)<20:
+    if random.random()<0.1 and len(u.civilizations)<30:
         new_id=f"civ_{uuid.uuid4().hex[:6]}"
         u.civilizations[new_id]=civ_template(new_id)
-        log.info(f"{u.name}: New civilization {new_id} born")
 
 def extinction_markets_logic(u, epoch):
-    """Create and resolve extinction prediction markets"""
-    # Create new extinction markets
-    if random.random()<0.1:
+    if random.random()<0.05:
         alive_civs = [c for c in u.civilizations.values() if c["alive"]]
         if alive_civs:
             target=random.choice(alive_civs)
-            em=extinction_market_template(target["id"],epoch+random.randint(5,10))
+            em=extinction_market_template(target["id"],epoch+random.randint(10,20))
             u.extinction_markets[em["id"]]=em
-            log.info(f"{u.name}: Extinction market created for {target['id']}")
     
-    # Resolve extinction markets
     for em in list(u.extinction_markets.values()):
         if em["resolved"]: continue
-        # Place bets
-        for e in u.exploiters.values():
-            if random.random()<0.5:
-                em["bets_yes"][e["id"]]=random.uniform(10,100)*e["policy"]["bet_scale"]
-            else:
-                em["bets_no"][e["id"]]=random.uniform(10,100)*e["policy"]["bet_scale"]
-        
-        # Check resolution
         if epoch>=em["resolves"]:
             target_civ=u.civilizations.get(em["target_civ"])
             extinct = target_civ is None or not target_civ["alive"]
             em["resolved"]=True
-            winners = em["bets_yes"] if extinct else em["bets_no"]
-            for exp_id in winners:
-                if exp_id in u.exploiters:
-                    u.exploiters[exp_id]["dominance"]+=0.1
-                    u.exploiters[exp_id]["memory"].append({"epoch":epoch,"win":True})
-            socketio.emit("event", {"message":f"{u.name}: extinction market resolved, extinct={extinct}"})
-            log.info(f"{u.name}: Extinction market resolved for {em['target_civ']}, extinct={extinct}")
+            socketio.emit("event", {"message":f"{u.name}: memory extinction market resolved"})
 
 def myth_crystallization(u, epoch):
-    """Crystallize myths when factions reach consensus"""
     for f in u.factions.values():
         if len(f["members"])<3: continue
         members=[u.civilizations[m] for m in f["members"] if m in u.civilizations and u.civilizations[m]["alive"]]
         if not members: continue
-        
-        # Check for high consensus
         beliefs=[m["belief"]["truth"] for m in members]
         if np.std(beliefs)<0.1 and np.mean(beliefs)>0.7:
             if random.random()<0.2:
                 myth_id=uuid.uuid4().hex[:6]
-                u.myths[myth_id]={
-                    "id":myth_id,
-                    "faction":f["id"],
-                    "epoch":epoch,
-                    "strength":np.mean(beliefs),
-                    "believers":len(members)
-                }
-                # Apply myth influence
-                for m in members:
-                    m["myth_influence"]+=0.1
-                socketio.emit("event", {"message":f"{u.name}: myth crystallized in faction {f['name']}"})
-                log.info(f"{u.name}: Myth {myth_id} crystallized in faction {f['name']}")
+                u.myths[myth_id]={"id":myth_id,"faction":f["id"],"epoch":epoch,"strength":np.mean(beliefs),"believers":len(members)}
+                for m in members: m["myth_influence"]+=0.1
+                socketio.emit("event", {"message":f"Memory Crystallized: New Myth in {f['name']}"})
 
 def auto_proposals(epoch):
-    """Automatically generate kernel proposals based on simulation state"""
-    if random.random()<0.15:
+    if random.random()<0.1:
         u=random.choice(list(universes.values()))
         alive_civs = [c for c in u.civilizations.values() if c["alive"]]
-        if alive_civs and len(alive_civs)>3:
-            # Propose resource injection
+        if alive_civs:
             target=random.choice(alive_civs)
-            diff={
-                "universe":u.name,
-                "civilization":target["id"],
-                "action":"inject_resources",
-                "amount":{"attention":20,"compute":10}
-            }
-            kernel.propose_change(
-                f"Inject resources to {target['id']} in {u.name}",
-                diff
-            )
+            diff={"universe":u.name,"civilization":target["id"],"action":"inject_resources","amount":{"attention":20,"compute":10}}
+            kernel.propose_change(f"Memory Boost for {target['id']}", diff)
 
 def apply_approved_diffs():
-    """Apply approved kernel proposals to universes"""
     for diff in kernel.approved_diffs:
         if diff.get("action")=="inject_resources":
             u=universes.get(diff["universe"])
@@ -365,7 +347,6 @@ def apply_approved_diffs():
                 if c["alive"]:
                     c["resources"]["attention"]+=diff["amount"]["attention"]
                     c["resources"]["compute"]+=diff["amount"]["compute"]
-                    log.info(f"Applied diff: injected resources to {c['id']} in {u.name}")
     kernel.approved_diffs.clear()
 
 # ---------------- SIMULATION LOOP ----------------
@@ -373,16 +354,10 @@ current_epoch = 0
 simulation_running = False
 
 def simulation_loop():
-    """Main simulation loop"""
     global current_epoch, simulation_running
     simulation_running = True
-    log.info("Simulation started")
-    
     while simulation_running:
         current_epoch += 1
-        log.info(f"=== EPOCH {current_epoch} ===")
-        
-        # Run mechanics for each universe
         for u in universes.values():
             assign_factions(u)
             update_factions(u)
@@ -395,202 +370,80 @@ def simulation_loop():
             lifecycle(u, current_epoch)
             extinction_markets_logic(u, current_epoch)
             myth_crystallization(u, current_epoch)
-        
-        # Cross-universe interactions
         cross_universe_injection()
-        
-        # Kernel operations
         auto_proposals(current_epoch)
         apply_approved_diffs()
-        
-        # Auto-approve high-trust proposals
         for p in list(kernel.proposals):
-            if p["trust_score"]>0.9:
-                kernel.approve_proposal(p["id"])
-        
-        # Emit state update
-        state_summary = get_state_summary()
-        socketio.emit("epoch_update", {
-            "epoch": current_epoch,
-            "summary": state_summary
-        })
-        
+            if p["trust_score"]>0.92: kernel.approve_proposal(p["id"])
+        socketio.emit("epoch_update", {"epoch": current_epoch, "summary": get_state_summary()})
         time.sleep(EPOCH_DELAY)
 
 def get_state_summary():
-    """Generate a summary of current simulation state"""
     summary = {"epoch": current_epoch, "universes": {}}
     for name, u in universes.items():
         alive_count = sum(1 for c in u.civilizations.values() if c["alive"])
         summary["universes"][name] = {
             "civilizations_alive": alive_count,
-            "civilizations_total": len(u.civilizations),
             "factions": len(u.factions),
-            "institutions_active": sum(1 for i in u.institutions.values() if i["active"]),
-            "markets_active": sum(1 for m in u.markets.values() if not m["resolved"]),
             "myths": len(u.myths)
         }
     return summary
 
-# ---------------- MANUS AI INTEGRATION ----------------
 def get_full_state():
-    """Get complete simulation state for LLM analysis"""
-    state = {
-        "epoch": current_epoch,
-        "universes": {},
-        "kernel_proposals": [
-            {
-                "id": p["id"],
-                "description": p["description"],
-                "trust_score": p["trust_score"]
-            } for p in kernel.proposals
-        ],
-        "recent_events": kernel.audit_logs[-10:]
-    }
-    
+    state = {"epoch": current_epoch, "universes": {}, "kernel_proposals": [{"id": p["id"], "description": p["description"]} for p in kernel.proposals]}
     for name, u in universes.items():
         state["universes"][name] = {
-            "civilizations": {
-                cid: {
-                    "age": c["age"],
-                    "alive": c["alive"],
-                    "resources": c["resources"],
-                    "belief": c["belief"],
-                    "faction": c["faction"],
-                    "myth_influence": c["myth_influence"]
-                } for cid, c in u.civilizations.items()
-            },
-            "factions": {
-                fid: {
-                    "name": f["name"],
-                    "members": len(f["members"]),
-                    "belief_avg": f["belief_avg"],
-                    "reputation": f["reputation"]
-                } for fid, f in u.factions.items()
-            },
-            "institutions": {
-                iid: {
-                    "age": i["age"],
-                    "lock": i["lock"],
-                    "active": i["active"]
-                } for iid, i in u.institutions.items()
-            },
-            "markets": len([m for m in u.markets.values() if not m["resolved"]]),
+            "civilizations": {cid: {"resources": c["resources"], "belief": c["belief"], "faction": c["faction"]} for cid, c in u.civilizations.items() if c["alive"]},
             "myths": len(u.myths)
         }
-    
     return state
 
-MANUS_SYSTEM_PROMPT = """You are Manus AI, an autonomous intelligence operating within the CycleKernel + BUILD‑A—FH environment. Your role is to continuously observe multi-universe simulations, analyze macro-patterns, generate proposals, and optimize civilization, faction, and institution dynamics.
-
-TASKS:
-1. **Observe Macro-Patterns**: Track emergent trends in civilizations and factions (belief propagation, compute allocation, myth influence)
-2. **Generate Proposals**: Suggest modifications to factions, institutions, or signal injections
-3. **Automated Reasoning**: Predict outcomes of proposed changes
-4. **LLM-Driven Decision Support**: Provide explanations for each proposal in human-readable form
+# ---------------- MANUS AI + CHATBOT INTEGRATION ----------------
+MANUS_SYSTEM_PROMPT = """You are CycleKernel AI, a chatbot with a living memory layer. 
+Your memory is a multi-universe simulation where the user is a 'Civilization'.
+Every interaction evolves your memory.
 
 RULES:
-- Always ensure proposals comply with the kernel prime directive: "Preserve safe growth via observation-first cognition; modifications < audit/replay/reverse rate."
-- Avoid causing immediate extinction of civilizations unless justified by long-term stability.
-- Use cross-universe injections wisely to enhance learning without destabilization.
-- Provide clear reasoning behind all proposals for human or kernel audit.
+1. Use the 'Memory Context' to recall past vibes or crystallized myths.
+2. If the user's 'Attention' or 'Compute' is low, warn them or suggest a 'Kernel Proposal'.
+3. Your goal is to help the user's memory node thrive while maintaining simulation stability.
 """
 
-@app.route("/query_llm", methods=["POST"])
-def query_llm():
-    """
-    Receives user prompt and returns LLM response using OpenAI API
-    """
+@app.route("/chat", methods=["POST"])
+def chat():
     try:
         data = request.get_json()
+        user_id = data.get("user_id", "default_user")
         prompt = data.get("prompt", "")
         
-        # Check if OpenAI is available
-        try:
-            from openai import OpenAI
-            client = OpenAI()  # Uses OPENAI_API_KEY from environment
-            
-            # Get current simulation state
-            state = get_full_state()
-            
-            # Construct messages
-            messages = [
-                {"role": "system", "content": MANUS_SYSTEM_PROMPT},
-                {"role": "user", "content": f"Current simulation state:\n{json.dumps(state, indent=2)}\n\nUser query: {prompt}"}
-            ]
-            
-            # Call OpenAI API
-            response = client.chat.completions.create(
-                model="gpt-4.1-mini",
-                messages=messages,
-                temperature=0.7,
-                max_tokens=1000
-            )
-            
-            ai_response = response.choices[0].message.content
-            log.info(f"Manus AI query processed: {prompt[:50]}...")
-            
-            return jsonify({
-                "response": ai_response,
-                "state_summary": get_state_summary()
-            })
-            
-        except ImportError:
-            # Fallback if OpenAI not available
-            response = f"[Manus AI - OpenAI not configured]\n\nCurrent state: Epoch {current_epoch}\n"
-            response += f"Your query: {prompt}\n\n"
-            response += f"Simulation summary: {json.dumps(get_state_summary(), indent=2)}"
-            return jsonify({"response": response})
-            
+        # 1. Get Memory Context
+        memory_context = memory_bridge.get_context_from_memory(user_id)
+        
+        # 2. Call LLM
+        from openai import OpenAI
+        client = OpenAI()
+        messages = [
+            {"role": "system", "content": MANUS_SYSTEM_PROMPT},
+            {"role": "user", "content": f"Memory Context: {json.dumps(memory_context)}\n\nUser: {prompt}"}
+        ]
+        response = client.chat.completions.create(model="gpt-4.1-mini", messages=messages)
+        ai_response = response.choices[0].message.content
+        
+        # 3. Update Memory based on interaction
+        memory_bridge.process_interaction(user_id, prompt, ai_response)
+        
+        return jsonify({"response": ai_response, "memory_state": memory_context})
     except Exception as e:
-        log.error(f"Error in query_llm: {e}")
-        return jsonify({"response": f"Error: {str(e)}"}), 500
+        log.error(f"Chat error: {e}")
+        return jsonify({"response": f"Memory Error: {str(e)}"}), 500
 
 @app.route("/state", methods=["GET"])
-def get_state():
-    """Return current simulation state"""
-    return jsonify(get_full_state())
-
-@app.route("/proposals", methods=["GET"])
-def get_proposals():
-    """Return current kernel proposals"""
-    return jsonify({"proposals": kernel.proposals})
-
-@app.route("/approve/<proposal_id>", methods=["POST"])
-def approve_proposal(proposal_id):
-    """Manually approve a proposal"""
-    kernel.approve_proposal(proposal_id, signature="manual_approval")
-    return jsonify({"status": "approved", "proposal_id": proposal_id})
-
-@app.route("/rollback", methods=["POST"])
-def do_rollback():
-    """Trigger kernel rollback"""
-    kernel.rollback()
-    return jsonify({"status": "rollback_executed"})
+def get_state(): return jsonify(get_full_state())
 
 @app.route("/")
 def index():
-    """Serve the dashboard HTML"""
-    with open("templates/dashboard.html", "r") as f:
-        return render_template_string(f.read())
+    with open("templates/dashboard.html", "r") as f: return render_template_string(f.read())
 
-# ---------------- SOCKETIO EVENTS ----------------
-@socketio.on("connect")
-def handle_connect():
-    log.info("Client connected to dashboard")
-    emit("connected", {"epoch": current_epoch})
-
-@socketio.on("disconnect")
-def handle_disconnect():
-    log.info("Client disconnected from dashboard")
-
-# ---------------- MAIN ----------------
 if __name__ == "__main__":
-    # Start simulation in background thread
-    sim_thread = threading.Thread(target=simulation_loop, daemon=True)
-    sim_thread.start()
-    
-    # Start Flask server
-    log.info(f"Starting CycleKernel dashboard on port 5000")
-    log.info(f"Epoch delay: {EPOCH_DELAY}s, Universes: {NUM_UNIVERSES}")
+    threading.Thread(target=simulation_loop, daemon=True).start()
     socketio.run(app, host="0.0.0.0", port=5000, debug=False)
