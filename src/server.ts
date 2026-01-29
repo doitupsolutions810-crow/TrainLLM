@@ -68,7 +68,113 @@ app.post('/analyze', async (req: Request, res: Response) => {
   }
 });
 
+// Unified LLM Integration Endpoints
+app.get('/unified-health', (req: Request, res: Response) => {
+  res.json({
+    component: 'trainllm',
+    status: 'online',
+    timestamp: new Date().toISOString(),
+    endpoints: [
+      '/health',
+      '/authorize',
+      '/execute',
+      '/token',
+      '/analyze',
+      '/unified-health',
+      '/cross-query',
+      '/sync-state'
+    ]
+  });
+});
+
+app.post('/cross-query', async (req: Request, res: Response) => {
+  const { query, context, component } = req.body;
+
+  if (!query) {
+    return res.status(400).json({ error: 'Query parameter required' });
+  }
+
+  try {
+    // Enhanced LLM query with cross-component context
+    const enhancedPrompt = `
+Component: ${component || 'unknown'}
+Query: ${query}
+Context: ${JSON.stringify(context || {}, null, 2)}
+
+Please provide analysis and recommendations considering the Anti4 ecosystem integration.
+    `.trim();
+
+    if (!llm) {
+      return res.status(503).json({ error: 'LLM not available' });
+    }
+
+    const response = await llm.generate(enhancedPrompt);
+    res.json({
+      component: 'trainllm',
+      query: query,
+      response: response,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post('/sync-state', (req: Request, res: Response) => {
+  const { unified_state, component_states } = req.body;
+
+  // Log cross-component state synchronization
+  console.log('State sync received:', {
+    timestamp: new Date().toISOString(),
+    unified_state_keys: Object.keys(unified_state || {}),
+    component_states_count: component_states ? Object.keys(component_states).length : 0
+  });
+
+  res.json({
+    status: 'synced',
+    component: 'trainllm',
+    timestamp: new Date().toISOString(),
+    message: 'State synchronization acknowledged'
+  });
+});
+
+app.post('/unified-action', (req: Request, res: Response) => {
+  const { action, target_component, parameters } = req.body;
+
+  if (!action || !target_component) {
+    return res.status(400).json({ error: 'Action and target_component required' });
+  }
+
+  // Log unified actions
+  console.log('Unified action received:', {
+    action,
+    target_component,
+    parameters,
+    timestamp: new Date().toISOString()
+  });
+
+  // Execute action based on target component
+  if (target_component === 'trainllm') {
+    // Handle internal TrainLLM actions
+    res.json({
+      status: 'executed',
+      component: 'trainllm',
+      action: action,
+      result: 'Action processed internally'
+    });
+  } else {
+    // Forward to other components via unified orchestrator
+    res.json({
+      status: 'forwarded',
+      target_component,
+      action,
+      message: 'Action forwarded to unified orchestrator'
+    });
+  }
+});
+
 const port = process.env.PORT ? parseInt(process.env.PORT) : 8080;
-app.listen(port, () => console.info(`Server listening on ${port}`));
+app.listen(port, () => console.info(`TrainLLM Server listening on ${port}`));
 
 export default app;

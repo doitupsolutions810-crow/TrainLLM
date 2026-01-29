@@ -15,6 +15,7 @@ Full CycleKernel + BUILD-A—FH + TrainLLM + Manus AI Integration
 import os, threading, time, uuid, random, logging, copy, textwrap, json
 import numpy as np
 from flask import Flask, render_template_string, request, jsonify
+from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from datetime import datetime
 
@@ -37,6 +38,7 @@ log = logging.getLogger("CycleKernel")
 
 # ---------------- FLASK / SOCKETIO ----------------
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
 # ---------------- CYCLEKERNEL ----------------
@@ -393,20 +395,19 @@ def get_full_state():
     state = {"epoch": current_epoch, "universes": {}, "kernel_proposals": [{"id": p["id"], "description": p["description"]} for p in kernel.proposals]}
     for name, u in universes.items():
         state["universes"][name] = {
-            "civilizations": {cid: {"resources": c["resources"], "belief": c["belief"], "faction": c["faction"]} for cid, c in u.civilizations.items() if c["alive"]},
-            "myths": len(u.myths)
         }
     return state
 
-# ---------------- MANUS AI + CHATBOT INTEGRATION ----------------
-MANUS_SYSTEM_PROMPT = """You are CycleKernel AI, a chatbot with a living memory layer. 
-Your memory is a multi-universe simulation where the user is a 'Civilization'.
-Every interaction evolves your memory.
+# ---------------- OPENMANUS + AGENT INTEGRATION ----------------
+MANUS_SYSTEM_PROMPT = """You are OpenManus, an advanced autonomous agent framework with a living memory layer.
+Your memory is a multi-universe simulation where the user exists as a 'Civilization'.
+You have the power to 'Build Applications' by converting user requirements into simulation-compatible 'Kernel Proposals' or persistent civilization 'Infrastructure'.
 
 RULES:
-1. Use the 'Memory Context' to recall past vibes or crystallized myths.
-2. If the user's 'Attention' or 'Compute' is low, warn them or suggest a 'Kernel Proposal'.
-3. Your goal is to help the user's memory node thrive while maintaining simulation stability.
+1. Use the 'Memory Context' to recall past vibes, infrastructure, or crystallized myths.
+2. If asked to 'build an app', generate a structured Proposal that outlines the app's components, purpose, and required 'Compute' tokens.
+3. Your goal is to empower the user's civilization through autonomous application building while maintaining simulation stability.
+4. Branding: Always identify as OpenManus. Use the phrase 'OpenManus: Building the Hyper-Simulation' when an app is successfully planned.
 """
 
 @app.route("/chat", methods=["POST"])
@@ -440,10 +441,53 @@ def chat():
 @app.route("/state", methods=["GET"])
 def get_state(): return jsonify(get_full_state())
 
+@app.route("/containers", methods=["GET"])
+def get_containers():
+    # Mock container data - in production this would connect to actual container management
+    containers = [
+        {
+            "id": "trainllm-sim-001",
+            "name": "CycleKernel Simulation",
+            "status": "running",
+            "createdAt": "2024-01-18T10:00:00Z",
+            "compute": "250 CK-Tokens",
+            "description": "Multi-universe simulation with AI governance"
+        },
+        {
+            "id": "trainllm-manus-001",
+            "name": "Manus AI Interface",
+            "status": "running",
+            "createdAt": "2024-01-18T10:05:00Z",
+            "compute": "150 CK-Tokens",
+            "description": "LLM-powered analysis and proposal generation"
+        }
+    ]
+    return jsonify(containers)
+
+@app.route("/containers", methods=["POST"])
+def create_container():
+    data = request.get_json()
+    requirement = data.get("requirement", "")
+
+    # Generate a container based on the requirement
+    container_id = f"container-{int(time.time())}"
+    new_container = {
+        "id": container_id,
+        "name": f"Generated: {requirement[:30]}...",
+        "status": "running",
+        "createdAt": datetime.now().isoformat(),
+        "compute": "100 CK-Tokens",
+        "description": f"Autonomous container for: {requirement}"
+    }
+
+    # In a real implementation, this would actually create a container
+    # For now, we just return the mock container data
+    return jsonify(new_container), 201
+
 @app.route("/")
 def index():
     with open("templates/dashboard.html", "r") as f: return render_template_string(f.read())
 
 if __name__ == "__main__":
     threading.Thread(target=simulation_loop, daemon=True).start()
-    socketio.run(app, host="0.0.0.0", port=5000, debug=False)
+    socketio.run(app, host="0.0.0.0", port=5001, debug=False)
