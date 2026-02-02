@@ -1,0 +1,45 @@
+2026-02-01 11:41:56,613 - __main__ - INFO - Starting voidOS bootstrap...
+2026-02-01 11:41:56,613 - __main__ - INFO - Loading seed from: /etc/voidos/seed.json
+2026-02-01 11:41:56,613 - __main__ - ERROR - Seed file not found: /etc/voidos/seed.json
+2026-02-01 11:41:56,613 - __main__ - ERROR - Failed to load seed
+2026-02-01 11:42:20,390 - __main__ - INFO - Starting voidOS bootstrap...
+2026-02-01 11:42:20,390 - __main__ - INFO - Loading seed from: /tmp/voidos/seed.json
+2026-02-01 11:42:20,390 - __main__ - ERROR - Missing required field in seed: telemetry_chain
+2026-02-01 11:42:20,390 - __main__ - ERROR - Seed validation failed
+2026-02-01 11:42:20,390 - __main__ - ERROR - Failed to load seed
+2026-02-01 11:42:53,463 - __main__ - INFO - Starting voidOS bootstrap...
+2026-02-01 11:42:53,464 - __main__ - INFO - Loading seed from: /tmp/voidos/seed.json
+2026-02-01 11:42:53,464 - __main__ - INFO - Seed loaded successfully: voidOS-test-seed-001
+2026-02-01 11:42:53,464 - __main__ - INFO -   Genesis Epoch: 1704067200
+2026-02-01 11:42:53,464 - __main__ - INFO -   Merkle Root: 0x1234567890abcdef
+2026-02-01 11:42:53,464 - __main__ - ERROR - Failed to create server: [Errno 48] Address already in use
+2026-02-01 11:43:00,633 - __main__ - INFO - Starting voidOS bootstrap...
+2026-02-01 11:43:00,633 - __main__ - INFO - Loading seed from: /tmp/voidos/seed.json
+2026-02-01 11:43:00,633 - __main__ - INFO - Seed loaded successfully: voidOS-test-seed-001
+2026-02-01 11:43:00,633 - __main__ - INFO -   Genesis Epoch: 1704067200
+2026-02-01 11:43:00,633 - __main__ - INFO -   Merkle Root: 0x1234567890abcdef
+2026-02-01 11:43:00,643 - __main__ - INFO - Server created on port 5001
+2026-02-01 11:43:00,643 - __main__ - INFO - Starting server in foreground...
+2026-02-01 11:43:05,117 - __main__ - INFO - 127.0.0.1 - code 404, message Not Found
+2026-02-01 11:43:05,117 - __main__ - INFO - 127.0.0.1 - "GET /api/apps/list HTTP/1.1" 404 -
+2026-02-01 11:43:12,360 - __main__ - INFO - 127.0.0.1 - code 404, message Not Found
+2026-02-01 11:43:12,361 - __main__ - INFO - 127.0.0.1 - "GET /api/apps/status HTTP/1.1" 404 -
+2026-02-01 11:43:13,929 - __main__ - INFO - Generating dashboard HTML...
+2026-02-01 11:43:13,929 - __main__ - WARNING - Template not found: /opt/voidos/dashboard_template.html, using default
+2026-02-01 11:43:13,930 - __main__ - INFO - 127.0.0.1 - "GET / HTTP/1.1" 200 -
+2026-02-01 11:43:21,821 - __main__ - INFO - 127.0.0.1 - code 404, message Not Found
+2026-02-01 11:43:21,821 - __main__ - INFO - 127.0.0.1 - "GET /?id=977fcfd6-f0b8-44b1-93f8-3b0f0665e746&vscodeBrowserReqId=1769964201816 HTTP/1.1" 404 -
+2026-02-01 11:48:29,586 - voidos_seed_bootstrap - INFO - Loading seed from: /tmp/voidos/seed.json
+2026-02-01 11:48:29,586 - voidos_seed_bootstrap - INFO - Seed loaded successfully: voidOS-test-seed-001
+2026-02-01 11:48:29,586 - voidos_seed_bootstrap - INFO -   Genesis Epoch: 1704067200
+2026-02-01 11:48:29,587 - voidos_seed_bootstrap - INFO -   Merkle Root: 0x1234567890abcdef
+2026-02-01 21:00:28,763 - voidos_seed_bootstrap - INFO - Loading seed from: /tmp/voidos/seed.json
+2026-02-01 21:00:28,764 - voidos_seed_bootstrap - INFO - Seed loaded successfully: voidOS-test-seed-001
+2026-02-01 21:00:28,764 - voidos_seed_bootstrap - INFO -   Genesis Epoch: 1704067200
+2026-02-01 21:00:28,764 - voidos_seed_bootstrap - INFO -   Merkle Root: 0x1234567890abcdef
+2026-02-01 21:42:19,918 - __main__ - INFO - 127.0.0.1 - code 404, message Not Found
+2026-02-01 21:42:19,918 - __main__ - INFO - 127.0.0.1 - "GET /state HTTP/1.1" 404 -
+2026-02-01 21:42:19,921 - __main__ - INFO - 127.0.0.1 - code 404, message Not Found
+2026-02-01 21:42:19,921 - __main__ - INFO - 127.0.0.1 - "GET /state HTTP/1.1" 404 -
+2026-02-01 21:42:19,924 - __main__ - INFO - 127.0.0.1 - code 404, message Not Found
+2026-02-01 21:42:19,924 - __main__ - INFO - 127.0.0.1 - "GET /state HTTP/1.1" 404 -
