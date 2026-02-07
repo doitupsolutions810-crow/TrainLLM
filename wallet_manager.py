@@ -8,6 +8,7 @@ Manages mining rewards, pools, balances, and withdrawals with USD conversion
 import json
 import os
 import sys
+import ssl
 from datetime import datetime
 from pathlib import Path
 import urllib.request
@@ -102,7 +103,12 @@ class WalletManager:
             url = f"https://api.coingecko.com/api/v3/simple/price?ids={crypto}&vs_currencies=usd"
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
             
-            with urllib.request.urlopen(req, timeout=5) as response:
+            # Create SSL context that doesn't verify (for development)
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            with urllib.request.urlopen(req, timeout=5, context=ssl_context) as response:
                 data = json.loads(response.read().decode())
                 rate = data.get(crypto, {}).get("usd", 0.0)
                 
