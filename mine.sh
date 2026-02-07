@@ -65,12 +65,12 @@ NC='\033[0m' # No Color
 mkdir -p "${LOG_DIR}"
 
 # Global performance tracking
-declare -g TOTAL_HASH_TIME=0
-declare -g TOTAL_HASHES=0
-declare -g BLOCK_TIMES=()
-declare -g MINING_START_TIME=$(date +%s)
-declare -g TEST_LAST_RUN=0
-declare -g CONSECUTIVE_FAILURES=0
+TOTAL_HASH_TIME=0
+TOTAL_HASHES=0
+BLOCK_TIMES=()
+MINING_START_TIME=$(date +%s)
+TEST_LAST_RUN=0
+CONSECUTIVE_FAILURES=0
 trap cleanup EXIT INT TERM
 
 cleanup() {
@@ -450,7 +450,7 @@ mining_iteration=0
 
 while true; do
     mining_iteration=$((mining_iteration + 1))
-    local loop_start=$(date +%s)
+    loop_start=$(date +%s)
     
     echo -e "${YELLOW}════════════════════════════════════════════${NC}"
     echo -e "${BLUE}Mining Iteration: #$mining_iteration${NC}"
