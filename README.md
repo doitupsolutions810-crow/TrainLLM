@@ -39,6 +39,32 @@ A comprehensive multi-universe simulation system with autonomous AI governance, 
 
 ## 🚀 Quick Start
 
+### Option 0: Auto-Deploy to Manus (Instant Hosting)
+
+This repository is equipped with a drop-in auto-deploy system for Manus.
+
+1. **Configure environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your MANUS_API_KEY and MANUS_APP_NAME
+   nano .env
+   ```
+
+2. **Deploy manually**
+   ```bash
+   pip install -r requirements.txt
+   python deploy_manus.py
+   ```
+
+3. **Auto-deploy via GitHub Actions**
+   - Add `MANUS_API_KEY` and `MANUS_APP_NAME` to your GitHub Repository Secrets.
+   - Every push to `main` will automatically trigger a deployment to Manus.
+
+4. **Verify deployment**
+   Access your live endpoint at: `https://<MANUS_APP_NAME>.manus.space/state`
+
+
+
 ### Option 1: Docker Deployment (Recommended)
 
 1. **Clone the repository**

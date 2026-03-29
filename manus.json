@@ -1,0 +1,6 @@
+{
+  "name": "cyclekernels",
+  "runtime": "python",
+  "start": "bash backend/start.sh",
+  "port": 8000
+}
