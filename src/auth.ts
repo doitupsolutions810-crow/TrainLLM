@@ -1,14 +1,31 @@
 import jwt from 'jsonwebtoken';
 
-export function signCapability(capability: string, secret: string): string {
-  return jwt.sign({ capability }, secret, { algorithm: 'HS256' });
+function requireAction(action: string): string {
+  if (typeof action !== 'string' || !action.trim()) {
+    throw new Error('an exact action is required for every capability token');
+  }
+  return action.trim();
 }
 
-export function verifyCapability(token: string, secret: string): boolean {
+export function signCapability(capability: string, secret: string, action: string): string {
+  return jwt.sign(
+    { capability, action: requireAction(action) },
+    secret,
+    { algorithm: 'HS256', expiresIn: '60s', issuer: 'trainllm', audience: 'trainllm' }
+  );
+}
+
+export function verifyCapability(token: string, secret: string, requiredAction: string): boolean {
   try {
-    const decoded = jwt.verify(token, secret);
-    return (decoded as { capability: string }).capability === 'scale-sla';
-  } catch (err) {
+    const action = requireAction(requiredAction);
+    const decoded = jwt.verify(token, secret, {
+      algorithms: ['HS256'],
+      issuer: 'trainllm',
+      audience: 'trainllm'
+    }) as jwt.JwtPayload;
+
+    return decoded.capability === 'scale-sla' && decoded.action === action;
+  } catch {
     return false;
   }
 }
