@@ -1,40 +1,52 @@
 import { blake3 } from 'blake3';
 import { verifySignature } from './utils/crypto';
 
-export function authorize(att: any, action: string) {
+/**
+ * Verify an action-scoped attestation against an operator-pinned trust root.
+ * The public key embedded in the attestation is metadata only; it is never
+ * used as the trust anchor.
+ */
+export function authorize(
+  att: any,
+  action: string,
+  trustedPublicKeyInput?: string
+): boolean {
   try {
-    if (!Object.values(att.invariants ?? {}).every(Boolean)) return false;
-    if (!att.policyProofs || !Object.keys(att.policyProofs).length) return false;
+    const trustedPublicKey = (trustedPublicKeyInput ?? process.env.TRAINLLM_ATTESTATION_PUBLIC_KEY ?? '')
+      .replace(/\\n/g, '\n')
+      .trim();
 
-    // Recompute proofHash over the attestation WITHOUT proofHash/signature/publicKey
-    const copy = { ...att } as any;
+    if (!trustedPublicKey || !att || typeof att !== 'object') return false;
+    if (typeof action !== 'string' || !action.trim()) return false;
+    if (typeof att.publicKey !== 'string' || att.publicKey.trim() !== trustedPublicKey) return false;
+    if (typeof att.proofHash !== 'string' || !/^[0-9a-f]{64}$/i.test(att.proofHash)) return false;
+    if (typeof att.signature !== 'string' || !/^[0-9a-f]{128}$/i.test(att.signature)) return false;
+
+    const invariants = att.invariants;
+    if (!invariants || typeof invariants !== 'object' || Array.isArray(invariants)) return false;
+    const invariantEntries = Object.entries(invariants);
+    if (invariantEntries.length === 0 || !invariantEntries.every(([, value]) => value === true)) return false;
+
+    const policyProofs = att.policyProofs;
+    if (!policyProofs || typeof policyProofs !== 'object' || Array.isArray(policyProofs)) return false;
+    if (policyProofs[action] !== true) return false;
+
+    const copy = { ...att };
     delete copy.proofHash;
     delete copy.signature;
     delete copy.publicKey;
 
-    const expected = blake3(JSON.stringify(copy)).toString('hex');
+    const payload = JSON.stringify(copy);
+    const expected = blake3(payload).toString('hex');
     if (expected !== att.proofHash) return false;
 
-    // If signature + publicKey present, verify signature against the base object
-    if (att.signature && att.publicKey) {
-      const sigBuf = Buffer.from(att.signature, 'hex');
-      const ok = verifySignature(JSON.stringify(copy), sigBuf, att.publicKey);
-      if (!ok) return false;
-    }
-
-    // Optionally incorporate action into authorization logic; for now we accept if hashes/signatures match
-    return true;
+    return verifySignature(payload, Buffer.from(att.signature, 'hex'), trustedPublicKey);
   } catch (err) {
     console.error('authorize error:', (err as Error).message);
     return false;
   }
 }
 
-// Additional authorization checks
-export function validateAction(att: any, action: string) {
-  if (!authorize(att, action)) {
-    console.error('Unauthorized action:', action);
-    return false;
-  }
-  return true;
+export function validateAction(att: any, action: string): boolean {
+  return authorize(att, action);
 }
