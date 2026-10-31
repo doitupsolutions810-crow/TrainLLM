@@ -72,11 +72,14 @@ app.post('/execute', (req: Request, res: Response) => {
 
   const diagnosticDigest = zkAttest(action, secret);
   logDisagreement('model-A', 'model-B', action);
-  logAction(action, 'executed');
 
-  // The current SHA-256 helper is a diagnostic placeholder, not a ZK proof.
-  return res.json({
-    executed: true,
+  // This repository currently has no governed action dispatcher. Do not turn
+  // authorization or logging into a false execution receipt.
+  logAction(action, 'authorized_not_executed');
+  return res.status(202).json({
+    executed: false,
+    authorized: true,
+    execution_status: 'NOT_IMPLEMENTED',
     evidence: {
       zk_proof_status: 'NOT_IMPLEMENTED',
       diagnostic_digest: diagnosticDigest
@@ -157,13 +160,23 @@ app.post('/sync-state', (req: Request, res: Response) => {
 });
 
 app.post('/unified-action', (req: Request, res: Response) => {
-  const { action, target_component, parameters } = req.body;
+  const { action, target_component } = req.body;
   if (!action || !target_component) return res.status(400).json({ error: 'Action and target_component required' });
-  console.log('Unified action received:', { action, target_component, parameters, timestamp: new Date().toISOString() });
   if (target_component === 'trainllm') {
-    return res.json({ status: 'accepted', component: 'trainllm', action, result: 'Action recorded; governed execution must use /execute' });
+    return res.status(202).json({
+      status: 'accepted',
+      component: 'trainllm',
+      action,
+      execution_status: 'NOT_IMPLEMENTED',
+      message: 'Recorded only; use a separately implemented and governed action handler before execution'
+    });
   }
-  return res.status(202).json({ status: 'forwarded', target_component, action, message: 'Action queued for the unified orchestrator' });
+  return res.status(501).json({
+    status: 'not_implemented',
+    target_component,
+    action,
+    message: 'No cross-component dispatcher is wired; no action was forwarded or executed'
+  });
 });
 
 const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
